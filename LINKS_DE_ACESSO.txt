@@ -1,0 +1,15 @@
+==============================================================
+   DELÍCIAS DA RITA - LINKS DE ACESSO AO SISTEMA DE COMANDAS
+==============================================================
+
+💻 LINK DO HOST (Acessar direto neste computador):
+http://localhost:3000
+
+📱 LINK REMOTO ATUAL (Acessar no Celular via 4G, 5G ou outro Wi-Fi):
+https://informed-rush-cricket-sticky.trycloudflare.com
+
+==============================================================
+Como ligar o sistema:
+Basta dar 2 cliques no atalho "LIGAR SISTEMA DE COMANDAS" 
+na Área de Trabalho do seu computador!
+==============================================================

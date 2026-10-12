@@ -1,0 +1,8 @@
+node_modules
+cloudflared.exe
+mingit
+ENVIAR_PARA_GITHUB
+dist
+.system_generated
+.gemini
+*.log
