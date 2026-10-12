@@ -126,6 +126,28 @@ export default function App() {
   const closedRevenue = closedOrders.reduce((acc, order) => acc + (order.total || 0), 0);
   const pendingRevenue = activeOrders.reduce((acc, order) => acc + (order.total || 0), 0);
 
+  // Função que verifica se a mesa (1 a 10) possui comanda aberta no momento
+  const isTableOccupied = (tableNumber: number) => {
+    return activeOrders.some(o => {
+      const match = o.table.match(/\d+/);
+      return match && parseInt(match[0], 10) === tableNumber;
+    });
+  };
+
+  // Garante que a mesa pré-selecionada em Nova Comanda seja sempre uma mesa livre
+  useEffect(() => {
+    const match = newOrderTable.match(/\d+/);
+    const curNum = match ? parseInt(match[0], 10) : 1;
+    if (isTableOccupied(curNum)) {
+      for (let i = 1; i <= 10; i++) {
+        if (!isTableOccupied(i)) {
+          setNewOrderTable(`Mesa ${String(i).padStart(2, '0')}`);
+          break;
+        }
+      }
+    }
+  }, [orders]);
+
   // Upload Helper (Converte em Base64 Data URL)
   const handleFileUpload = async (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -186,12 +208,14 @@ export default function App() {
 
     // Extrai o número da mesa em sequência (ex: Mesa 01 -> *001, Mesa 2 -> *002)
     const match = newOrderTable.match(/\d+/);
-    let orderNum = 1;
-    if (match) {
-      orderNum = parseInt(match[0], 10);
-    } else {
-      orderNum = orders.length + 1;
+    const orderNum = match ? parseInt(match[0], 10) : 1;
+
+    // Impede criação se a mesa já possui comanda aberta
+    if (isTableOccupied(orderNum)) {
+      alert(`A Mesa ${orderNum} já possui uma comanda aberta! Por favor finalize a comanda dela antes ou selecione outra mesa.`);
+      return;
     }
+
     const orderCode = `*${String(orderNum).padStart(3, '0')}`;
 
     const total = newOrderCart.reduce((acc, item) => acc + (item.price * item.qty), 0);
@@ -209,9 +233,16 @@ export default function App() {
     await cloudSync.saveOrder(newOrder);
     setNewOrderCart([]);
     setNewOrderCustomer('');
-    // Atualiza a sugestão para a próxima mesa em sequência
-    const nextNum = String(orderNum + 1).padStart(2, '0');
-    setNewOrderTable(`Mesa ${nextNum}`);
+
+    // Procura a próxima mesa livre de 1 a 10
+    let nextFreeTable = 'Mesa 01';
+    for (let i = 1; i <= 10; i++) {
+      if (i !== orderNum && !isTableOccupied(i)) {
+        nextFreeTable = `Mesa ${String(i).padStart(2, '0')}`;
+        break;
+      }
+    }
+    setNewOrderTable(nextFreeTable);
     setActiveTab('orders'); // Redireciona para lista de comandas
   };
 
@@ -1263,50 +1294,50 @@ export default function App() {
                 {/* Campos de Mesa e Cliente */}
                 <div className="space-y-3 my-4">
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-2">
                       <label className="block text-[11px] font-semibold text-[#a89985]">Selecione a Mesa (1 a 10) *</label>
                       <span className="text-[11px] font-bold text-[#e28c38] font-mono">{newOrderTable}</span>
                     </div>
 
-                    {/* Botões Rápidos de Toque (1 a 10) */}
-                    <div className="grid grid-cols-5 gap-1.5 mb-2">
+                    {/* Cartõezinhos com o Número da Mesa (1 a 10) */}
+                    <div className="grid grid-cols-5 gap-2">
                       {Array.from({ length: 10 }, (_, i) => {
-                        const mStr = `Mesa ${String(i + 1).padStart(2, '0')}`;
-                        const isSel = newOrderTable === mStr;
+                        const mNum = i + 1;
+                        const mStr = `Mesa ${String(mNum).padStart(2, '0')}`;
+                        const isOccupied = isTableOccupied(mNum);
+                        const isSelected = newOrderTable === mStr;
+
                         return (
                           <button
                             key={i}
                             type="button"
-                            onClick={() => setNewOrderTable(mStr)}
-                            className={`py-2 rounded-xl text-xs font-bold transition-all ${
-                              isSel 
-                                ? 'bg-[#e28c38] text-black font-extrabold shadow-md scale-105' 
-                                : 'bg-[#121317] text-[#d4c3ab] hover:bg-[#22242e] border border-[#2d261e]'
+                            disabled={isOccupied}
+                            onClick={() => !isOccupied && setNewOrderTable(mStr)}
+                            title={isOccupied ? `Mesa ${mNum} já possui comanda em aberto` : `Mesa ${mNum} Livre para abrir pedido`}
+                            className={`py-2 px-1 rounded-xl text-center flex flex-col items-center justify-center transition-all ${
+                              isOccupied
+                                ? 'bg-[#151214] text-[#69484b] border border-[#3b1d20] cursor-not-allowed opacity-60'
+                                : isSelected
+                                  ? 'bg-[#e28c38] text-black font-black border-2 border-[#ffaa55] shadow-lg scale-105'
+                                  : 'bg-[#14151b] text-[#d4c3ab] hover:bg-[#20222c] border border-[#2d251e] hover:border-[#e28c38]/50 active:scale-95'
                             }`}
                           >
-                            Mesa {i + 1}
+                            <span className="text-xs font-bold leading-none mb-1">
+                              Mesa {mNum}
+                            </span>
+                            <span className={`text-[9px] font-extrabold uppercase tracking-wider ${
+                              isOccupied 
+                                ? 'text-rose-400' 
+                                : isSelected 
+                                  ? 'text-black' 
+                                  : 'text-emerald-400'
+                            }`}>
+                              {isOccupied ? 'Ocupada' : 'Livre'}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
-
-                    {/* Menu Suspenso Alternativo */}
-                    <select
-                      value={newOrderTable}
-                      onChange={(e) => setNewOrderTable(e.target.value)}
-                      className="w-full bg-[#121317] border border-[#2d261e] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#e28c38]"
-                    >
-                      {Array.from({ length: 10 }, (_, i) => {
-                        const mStr = `Mesa ${String(i + 1).padStart(2, '0')}`;
-                        return (
-                          <option key={i} value={mStr}>
-                            {mStr}
-                          </option>
-                        );
-                      })}
-                      <option value="Balcão">Balcão</option>
-                      <option value="Delivery / Viagem">Delivery / Viagem</option>
-                    </select>
                   </div>
 
                   <div>
