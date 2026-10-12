@@ -1056,7 +1056,7 @@ export default function App() {
                       : 'bg-[#2a2723] text-[#6b6256] cursor-not-allowed'
                   }`}
                 >
-                  Finalizar
+                  Finalizar Comanda
                 </button>
               </div>
 
@@ -1064,7 +1064,7 @@ export default function App() {
 
           </div>
 
-          {/* BARRA FLUTUANTE INFERIOR: RESUMO RÁPIDO & RESUMO DA COMANDA */}
+          {/* BARRA FLUTUANTE INFERIOR: RESUMO RÁPIDO & RESUMO DO PEDIDO */}
           {newOrderCart.length > 0 && (
             <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#16181f]/95 backdrop-blur-md border-t border-[#3e3226] p-3 px-4 shadow-[0_-10px_25px_rgba(0,0,0,0.7)] flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1081,11 +1081,12 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  cartSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  const el = document.getElementById('resumo-comanda') || cartSummaryRef.current;
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 className="px-4 py-2.5 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
               >
-                <span>Resumo da Comanda</span>
+                <span>Resumo do Pedido</span>
                 <ChevronDown className="w-4 h-4 animate-bounce" />
               </button>
             </div>
