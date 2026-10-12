@@ -107,7 +107,9 @@ export default function App() {
   // Cálculos do Painel Inicial
   const activeOrders = orders.filter(o => o.status !== 'Finalizada');
   const closedOrders = orders.filter(o => o.status === 'Finalizada');
-  const totalRevenue = orders.reduce((acc, order) => acc + (order.total || 0), 0);
+  // Faturamento do dia considera ESTRITAMENTE as comandas fechadas/finalizadas
+  const closedRevenue = closedOrders.reduce((acc, order) => acc + (order.total || 0), 0);
+  const pendingRevenue = activeOrders.reduce((acc, order) => acc + (order.total || 0), 0);
 
   // Upload Helper (Converte em Base64 Data URL)
   const handleFileUpload = async (file: File): Promise<string> => {
@@ -196,20 +198,43 @@ export default function App() {
     await cloudSync.deleteOrder(orderId);
   };
 
+  // Lançar ou Incrementar Item em Comanda Aberta (Agrupa itens idênticos no mesmo lugar)
   const handleAddItemToExistingOrder = async () => {
     if (!orderToEditItems || !selectedProdForExisting) return;
 
-    const newItem: OrderItem = {
-      id: selectedProdForExisting.id,
-      name: selectedProdForExisting.name,
-      price: selectedProdForExisting.price,
-      qty: existingOrderQty,
-      notes: existingOrderNotes.trim()
-    };
+    // Verificar se o item já existe na comanda (pelo ID ou pelo Nome)
+    const existingIndex = orderToEditItems.items.findIndex(
+      it => it.id === selectedProdForExisting.id || it.name.trim().toLowerCase() === selectedProdForExisting.name.trim().toLowerCase()
+    );
 
-    const updatedItems = [...orderToEditItems.items, newItem];
+    const updatedItems = [...orderToEditItems.items];
+
+    if (existingIndex >= 0) {
+      // Já existe! Soma na quantidade que já está lá em cima (não cria linha duplicada)
+      const item = updatedItems[existingIndex];
+      const newQty = item.qty + existingOrderQty;
+      const combinedNotes = existingOrderNotes.trim()
+        ? (item.notes ? `${item.notes} | ${existingOrderNotes.trim()}` : existingOrderNotes.trim())
+        : item.notes;
+
+      updatedItems[existingIndex] = {
+        ...item,
+        qty: newQty,
+        notes: combinedNotes
+      };
+    } else {
+      // Não existia ainda: adiciona novo item
+      const newItem: OrderItem = {
+        id: selectedProdForExisting.id,
+        name: selectedProdForExisting.name,
+        price: selectedProdForExisting.price,
+        qty: existingOrderQty,
+        notes: existingOrderNotes.trim()
+      };
+      updatedItems.push(newItem);
+    }
+
     const updatedTotal = updatedItems.reduce((acc, item) => acc + (item.price * item.qty), 0);
-
     const updatedOrder: Order = {
       ...orderToEditItems,
       items: updatedItems,
@@ -221,6 +246,27 @@ export default function App() {
     setSelectedProdForExisting(null);
     setExistingOrderQty(1);
     setExistingOrderNotes('');
+  };
+
+  // Alterar quantidade direta de um item já lançado na comanda (+1 / -1)
+  const handleUpdateExistingOrderItemQty = async (order: Order, itemIdx: number, delta: number) => {
+    const updatedItems = [...order.items];
+    const item = updatedItems[itemIdx];
+    if (!item) return;
+
+    const newQty = item.qty + delta;
+    if (newQty <= 0) {
+      // Remover se quantidade zerar
+      updatedItems.splice(itemIdx, 1);
+    } else {
+      updatedItems[itemIdx] = { ...item, qty: newQty };
+    }
+
+    const updatedTotal = updatedItems.reduce((acc, it) => acc + (it.price * it.qty), 0);
+    const updatedOrder: Order = { ...order, items: updatedItems, total: updatedTotal };
+
+    await cloudSync.saveOrder(updatedOrder);
+    if (orderToEditItems?.id === order.id) setOrderToEditItems(updatedOrder);
   };
 
   const handleRemoveItemFromExistingOrder = async (order: Order, itemIdx: number) => {
@@ -496,11 +542,19 @@ export default function App() {
                   </div>
 
                   {/* Total Gerado em Destaque */}
-                  <div className="mt-5 pt-3 border-t border-[#312921] flex items-center justify-between">
-                    <span className="text-xs text-[#a99882]">Faturamento do Dia:</span>
-                    <span className="text-base sm:text-lg font-extrabold text-[#e28c38] font-mono">
-                      R$ {totalRevenue.toFixed(2).replace('.', ',')}
-                    </span>
+                  <div className="mt-5 pt-3 border-t border-[#312921] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#a99882]">Faturamento do Dia:</span>
+                      <span className="text-base sm:text-lg font-extrabold text-[#e28c38] font-mono">
+                        R$ {closedRevenue.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                    {pendingRevenue > 0 && (
+                      <div className="flex items-center justify-between text-[11px] text-[#7d7162]">
+                        <span>A receber (mesas abertas):</span>
+                        <span className="font-mono text-[#d4c3ab]">R$ {pendingRevenue.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -655,12 +709,30 @@ export default function App() {
                           order.items.map((it, idx) => (
                             <div key={idx} className="flex items-start justify-between text-xs p-2 rounded-lg bg-[#121317] border border-[#25201a]">
                               <div className="flex-1 pr-2">
-                                <div className="flex items-center gap-1.5 font-bold text-white">
-                                  <span className="text-[#e28c38]">{it.qty}x</span>
-                                  <span>{it.name}</span>
+                                <div className="flex items-center gap-2 font-bold text-white flex-wrap">
+                                  {!isClosed ? (
+                                    <div className="flex items-center gap-1 bg-[#1a1c24] px-1.5 py-0.5 rounded border border-[#382f25]">
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleUpdateExistingOrderItemQty(order, idx, -1)}
+                                        className="w-5 h-5 rounded flex items-center justify-center bg-[#252834] hover:bg-[#e28c38] hover:text-black text-[#e28c38] font-bold text-xs"
+                                        title="Diminuir quantidade"
+                                      >-</button>
+                                      <span className="text-[#e28c38] font-mono px-1 font-extrabold">{it.qty}x</span>
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleUpdateExistingOrderItemQty(order, idx, 1)}
+                                        className="w-5 h-5 rounded flex items-center justify-center bg-[#252834] hover:bg-[#e28c38] hover:text-black text-[#e28c38] font-bold text-xs"
+                                        title="Aumentar quantidade (+1)"
+                                      >+</button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#e28c38] font-bold">{it.qty}x</span>
+                                  )}
+                                  <span className="truncate">{it.name}</span>
                                 </div>
                                 {it.notes && (
-                                  <p className="text-[10px] text-[#d4c3ab]/80 italic pl-4">↳ Obs: {it.notes}</p>
+                                  <p className="text-[10px] text-[#d4c3ab]/80 italic pl-1 mt-0.5">↳ Obs: {it.notes}</p>
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
@@ -670,7 +742,7 @@ export default function App() {
                                 {!isClosed && (
                                   <button 
                                     onClick={() => handleRemoveItemFromExistingOrder(order, idx)}
-                                    className="text-rose-400 hover:text-rose-300"
+                                    className="text-rose-400 hover:text-rose-300 p-0.5"
                                     title="Remover item"
                                   >
                                     <X className="w-3.5 h-3.5" />
@@ -796,6 +868,25 @@ export default function App() {
             {/* LADO ESQUERDO / CENTRAL: CARDÁPIO INTERATIVO */}
             <div className="lg:col-span-2 space-y-4">
               
+              {/* Barra de Pesquisa de Pratos */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchMenuQuery}
+                  onChange={(e) => setSearchMenuQuery(e.target.value)}
+                  placeholder="🔍 Pesquisar prato, porção, bebida ou sobremesa..."
+                  className="w-full bg-[#181a20] border border-[#2d251d] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#e28c38] placeholder-[#7d7162]"
+                />
+                {searchMenuQuery && (
+                  <button
+                    onClick={() => setSearchMenuQuery('')}
+                    className="absolute right-3 top-2.5 text-[#8e8070] hover:text-white text-xs font-semibold"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+
               {/* Filtros de Categoria */}
               <div className="flex items-center gap-2 overflow-x-auto pb-2">
                 {categories.map(cat => (
@@ -1210,69 +1301,98 @@ export default function App() {
                 })}
               </div>
 
-              {selectedProdForExisting && (
-                <div className="p-3.5 rounded-xl bg-[#121317] border border-[#e28c38]/40 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-white">{selectedProdForExisting.name}</span>
-                    <span className="font-mono font-bold text-[#e28c38]">
-                      R$ {selectedProdForExisting.price.toFixed(2).replace('.', ',')}
-                    </span>
-                  </div>
+              {selectedProdForExisting && (() => {
+                const alreadyInOrder = orderToEditItems.items.find(
+                  it => it.id === selectedProdForExisting.id || it.name.trim().toLowerCase() === selectedProdForExisting.name.trim().toLowerCase()
+                );
+                return (
+                  <div className="p-3.5 rounded-xl bg-[#121317] border border-[#e28c38]/40 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-white">{selectedProdForExisting.name}</span>
+                      <span className="font-mono font-bold text-[#e28c38]">
+                        R$ {selectedProdForExisting.price.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-[#8e8070] mb-1">Quantidade</label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExistingOrderQty(Math.max(1, existingOrderQty - 1))}
-                          className="w-7 h-7 rounded bg-[#20222a] text-[#e28c38] font-bold"
-                        >-</button>
-                        <span className="font-bold text-sm text-white px-2">{existingOrderQty}</span>
-                        <button
-                          type="button"
-                          onClick={() => setExistingOrderQty(existingOrderQty + 1)}
-                          className="w-7 h-7 rounded bg-[#e28c38] text-black font-bold"
-                        >+</button>
+                    {alreadyInOrder && (
+                      <div className="bg-[#2a221b] border border-[#e28c38]/50 rounded-lg p-2 text-[11px] text-[#e8d8be]">
+                        ℹ️ Já tem <strong className="text-[#e28c38]">{alreadyInOrder.qty}x</strong> deste item na comanda. Ao adicionar, somará direto no item existente ficando <strong className="text-white">{alreadyInOrder.qty + existingOrderQty}x</strong>!
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] text-[#8e8070] mb-1">Quantidade a somar</label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setExistingOrderQty(Math.max(1, existingOrderQty - 1))}
+                            className="w-7 h-7 rounded bg-[#20222a] text-[#e28c38] font-bold"
+                          >-</button>
+                          <span className="font-bold text-sm text-white px-2">{existingOrderQty}</span>
+                          <button
+                            type="button"
+                            onClick={() => setExistingOrderQty(existingOrderQty + 1)}
+                            className="w-7 h-7 rounded bg-[#e28c38] text-black font-bold"
+                          >+</button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-[#8e8070] mb-1">Observações</label>
+                        <input
+                          type="text"
+                          value={existingOrderNotes}
+                          onChange={(e) => setExistingOrderNotes(e.target.value)}
+                          placeholder="Ex: bem gelado, sem gelo..."
+                          className="w-full bg-[#181a20] border border-[#2d261e] rounded-lg px-2.5 py-1 text-xs text-white"
+                        />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] text-[#8e8070] mb-1">Observações</label>
-                      <input
-                        type="text"
-                        value={existingOrderNotes}
-                        onChange={(e) => setExistingOrderNotes(e.target.value)}
-                        placeholder="Ex: sem pimenta..."
-                        className="w-full bg-[#181a20] border border-[#2d261e] rounded-lg px-2.5 py-1 text-xs text-white"
-                      />
-                    </div>
+                    <button
+                      onClick={handleAddItemToExistingOrder}
+                      className="w-full py-2.5 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-bold text-xs uppercase tracking-wide transition-all shadow-md"
+                    >
+                      {alreadyInOrder
+                        ? `Somar +${existingOrderQty} ao item existente (${alreadyInOrder.qty + existingOrderQty}x total)`
+                        : `Adicionar à Comanda (+${existingOrderQty})`}
+                    </button>
                   </div>
-
-                  <button
-                    onClick={handleAddItemToExistingOrder}
-                    className="w-full py-2 rounded-xl bg-[#e28c38] text-black font-bold text-xs uppercase"
-                  >
-                    Adicionar à Comanda
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Itens já existentes */}
               <div className="pt-2 border-t border-[#2d261e]">
                 <h4 className="text-xs font-bold text-[#d4c3ab] mb-2">Itens desta comanda:</h4>
-                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                   {orderToEditItems.items.map((it, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-[#121317]">
-                      <div>
-                        <span className="font-bold text-[#e28c38]">{it.qty}x</span> <span className="text-white">{it.name}</span>
-                        {it.notes && <span className="text-[10px] text-[#8e8070] ml-2">({it.notes})</span>}
+                    <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-[#121317] border border-[#25201a]">
+                      <div className="flex items-center gap-2 flex-1 pr-2">
+                        <div className="flex items-center gap-1 bg-[#1e2029] px-1 py-0.5 rounded border border-[#332a21]">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateExistingOrderItemQty(orderToEditItems, idx, -1)}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-[#292c3a] text-[#e28c38] font-bold text-xs hover:bg-[#e28c38] hover:text-black"
+                            title="Diminuir"
+                          >-</button>
+                          <span className="font-bold text-[#e28c38] px-1 font-mono">{it.qty}x</span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateExistingOrderItemQty(orderToEditItems, idx, 1)}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-[#292c3a] text-[#e28c38] font-bold text-xs hover:bg-[#e28c38] hover:text-black"
+                            title="Aumentar"
+                          >+</button>
+                        </div>
+                        <span className="text-white font-medium truncate">{it.name}</span>
+                        {it.notes && <span className="text-[10px] text-[#8e8070] italic">({it.notes})</span>}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-[#d4c3ab]">R$ {(it.price * it.qty).toFixed(2).replace('.', ',')}</span>
                         <button
                           onClick={() => handleRemoveItemFromExistingOrder(orderToEditItems, idx)}
-                          className="text-rose-400"
+                          className="text-rose-400 hover:text-rose-300 p-0.5"
+                          title="Remover"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
