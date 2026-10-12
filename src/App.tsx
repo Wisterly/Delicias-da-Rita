@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Printer,
   ChevronRight,
+  ChevronDown,
   ShoppingBag,
   Cloud,
   CheckCircle
@@ -66,6 +67,7 @@ export default function App() {
 
   const fileInputLogoRef = useRef<HTMLInputElement>(null);
   const fileInputProdRef = useRef<HTMLInputElement>(null);
+  const cartSummaryRef = useRef<HTMLDivElement>(null);
 
   // 1. SINCRONIZAÇÃO EM TEMPO REAL (FIREBASE / LOCAL)
   useEffect(() => {
@@ -138,6 +140,11 @@ export default function App() {
         notes: ''
       }]);
     }
+
+    // Rolagem automática suave para baixo até o resumo da comanda e botão de finalizar
+    setTimeout(() => {
+      cartSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
   };
 
   const handleUpdateCartQty = (productId: string, delta: number) => {
@@ -854,7 +861,7 @@ export default function App() {
           ABA 3: NOVA COMANDA (Abertura de Mesa & Montagem)
          ======================================================== */}
       {activeTab === 'new-order' && (
-        <section className="max-w-6xl mx-auto w-full px-4 py-8 flex-1">
+        <section className={`max-w-6xl mx-auto w-full px-4 py-8 flex-1 ${newOrderCart.length > 0 ? 'pb-28' : ''}`}>
           
           <div className="mb-6">
             <h2 className="text-xl font-bold text-[#e8d8be] flex items-center gap-2">
@@ -949,7 +956,11 @@ export default function App() {
             </div>
 
             {/* LADO DIREITO: RESUMO DA COMANDA SENDO MONTADA */}
-            <div className="bg-[#181a20] rounded-2xl p-5 border border-[#382f25] flex flex-col justify-between shadow-xl h-fit">
+            <div 
+              ref={cartSummaryRef}
+              id="resumo-comanda"
+              className="bg-[#181a20] rounded-2xl p-5 border border-[#382f25] flex flex-col justify-between shadow-xl h-fit scroll-mt-24"
+            >
               <div>
                 <h3 className="text-base font-bold text-[#e8d8be] pb-3 border-b border-[#2d261e] flex items-center justify-between">
                   <span>Resumo do Pedido</span>
@@ -991,7 +1002,7 @@ export default function App() {
 
                   {newOrderCart.length === 0 ? (
                     <div className="py-8 text-center text-xs text-[#6e6355] italic">
-                      Nenhum prato selecionado ainda.<br />Toque nos pratos do cardápio à esquerda.
+                      Nenhum prato selecionado ainda.<br />Toque nos pratos do cardápio para adicionar.
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -1044,19 +1055,46 @@ export default function App() {
                 <button
                   onClick={handleConfirmCreateOrder}
                   disabled={newOrderCart.length === 0}
-                  className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg ${
+                  className={`w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg ${
                     newOrderCart.length > 0
-                      ? 'bg-[#e28c38] hover:bg-[#d07b28] text-black active:scale-98'
+                      ? 'bg-[#e28c38] hover:bg-[#d07b28] text-black active:scale-98 shadow-[0_4px_15px_rgba(226,140,56,0.3)]'
                       : 'bg-[#2a2723] text-[#6b6256] cursor-not-allowed'
                   }`}
                 >
-                  Confirmar e Abrir Comanda
+                  Finalizar e Abrir Comanda
                 </button>
               </div>
 
             </div>
 
           </div>
+
+          {/* BARRA FLUTUANTE INFERIOR: RESUMO RÁPIDO & FINALIZAR COMANDA */}
+          {newOrderCart.length > 0 && (
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#16181f]/95 backdrop-blur-md border-t border-[#3e3226] p-3 px-4 shadow-[0_-10px_25px_rgba(0,0,0,0.7)] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#e28c38] text-black flex items-center justify-center font-bold text-sm shadow-md">
+                  {newOrderCart.reduce((acc, it) => acc + it.qty, 0)}
+                </div>
+                <div>
+                  <span className="text-[11px] text-[#8e8070] block">Itens no resumo:</span>
+                  <span className="text-sm font-extrabold text-[#e28c38] font-mono">
+                    R$ {newOrderCart.reduce((acc, it) => acc + (it.price * it.qty), 0).toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  cartSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-extrabold text-xs uppercase flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+              >
+                <span>Finalizar Comanda</span>
+                <ChevronDown className="w-4 h-4 animate-bounce" />
+              </button>
+            </div>
+          )}
 
         </section>
       )}
