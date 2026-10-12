@@ -171,10 +171,20 @@ export default function App() {
       return;
     }
 
+    // Extrai o número da mesa em sequência (ex: Mesa 01 -> *001, Mesa 2 -> *002)
+    const match = newOrderTable.match(/\d+/);
+    let orderNum = 1;
+    if (match) {
+      orderNum = parseInt(match[0], 10);
+    } else {
+      orderNum = orders.length + 1;
+    }
+    const orderCode = `*${String(orderNum).padStart(3, '0')}`;
+
     const total = newOrderCart.reduce((acc, item) => acc + (item.price * item.qty), 0);
     const newOrder: Order = {
       id: 'cmd-' + Date.now(),
-      orderCode: '#' + Math.floor(100 + Math.random() * 900),
+      orderCode,
       table: newOrderTable.trim(),
       customer: newOrderCustomer.trim(),
       status: 'Aberta',
@@ -186,6 +196,9 @@ export default function App() {
     await cloudSync.saveOrder(newOrder);
     setNewOrderCart([]);
     setNewOrderCustomer('');
+    // Atualiza a sugestão para a próxima mesa em sequência
+    const nextNum = String(orderNum + 1).padStart(2, '0');
+    setNewOrderTable(`Mesa ${nextNum}`);
     setActiveTab('orders'); // Redireciona para lista de comandas
   };
 
@@ -681,7 +694,11 @@ export default function App() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-base font-extrabold text-white">{order.table}</span>
-                            <span className="text-xs font-mono font-bold text-[#e28c38]">{order.orderCode}</span>
+                            <span className="text-xs font-mono font-bold text-[#e28c38]">
+                              {order.orderCode?.startsWith('*') 
+                                ? order.orderCode 
+                                : '*' + (order.orderCode?.replace(/\D/g, '') || '001').padStart(3, '0')}
+                            </span>
                           </div>
                           {order.customer && (
                             <p className="text-xs text-[#a39480] mt-0.5">Cliente: <strong className="text-[#e8d8be]">{order.customer}</strong></p>
@@ -909,43 +926,63 @@ export default function App() {
 
               {/* Grid dos Pratos do Cardápio */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[620px] overflow-y-auto pr-1">
-                {filteredProducts.map(prod => (
-                  <div
-                    key={prod.id}
-                    onClick={() => handleAddToCart(prod)}
-                    className="p-3 rounded-2xl bg-[#16181e] border border-[#2d251d] hover:border-[#e28c38]/60 transition-all cursor-pointer flex gap-3 group"
-                  >
-                    {prod.image && (
-                      <div className="w-20 h-20 min-w-[80px] min-h-[80px] sm:w-24 sm:h-24 sm:min-w-[96px] sm:min-h-[96px] rounded-xl overflow-hidden bg-black flex-shrink-0">
-                        <img 
-                          src={prod.image} 
-                          alt={prod.name} 
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 flex flex-col justify-between min-w-0">
-                      <div>
-                        <h4 className="text-sm font-bold text-white group-hover:text-[#e28c38] transition-colors truncate">
-                          {prod.name}
-                        </h4>
-                        <p className="text-[11px] text-[#8e8070] line-clamp-2 mt-0.5">
-                          {prod.description}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#25201a]">
-                        <span className="font-mono font-bold text-[#e28c38] text-xs">
-                          R$ {prod.price.toFixed(2).replace('.', ',')}
-                        </span>
-                        <span className="text-[10px] font-bold text-black bg-[#e28c38] px-2 py-0.5 rounded-full">
-                          + Adicionar
-                        </span>
+                {filteredProducts.map(prod => {
+                  const cartItem = newOrderCart.find(it => it.id === prod.id);
+                  const inCartQty = cartItem ? cartItem.qty : 0;
+
+                  return (
+                    <div
+                      key={prod.id}
+                      onClick={() => handleAddToCart(prod)}
+                      className={`p-3 rounded-2xl bg-[#16181e] border transition-all cursor-pointer flex gap-3 group relative ${
+                        inCartQty > 0 
+                          ? 'border-[#e28c38]/70 bg-[#1a1b22] shadow-[0_0_15px_rgba(226,140,56,0.12)]' 
+                          : 'border-[#2d251d] hover:border-[#e28c38]/60'
+                      }`}
+                    >
+                      {prod.image && (
+                        <div className="w-20 h-20 min-w-[80px] min-h-[80px] sm:w-24 sm:h-24 sm:min-w-[96px] sm:min-h-[96px] rounded-xl overflow-hidden bg-black flex-shrink-0">
+                          <img 
+                            src={prod.image} 
+                            alt={prod.name} 
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 flex flex-col justify-between min-w-0">
+                        <div>
+                          <h4 className="text-sm font-bold text-white group-hover:text-[#e28c38] transition-colors truncate">
+                            {prod.name}
+                          </h4>
+                          <p className="text-[11px] text-[#8e8070] line-clamp-2 mt-0.5">
+                            {prod.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#25201a]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-[#e28c38] text-xs">
+                              R$ {prod.price.toFixed(2).replace('.', ',')}
+                            </span>
+                            {inCartQty > 0 && (
+                              <span className="text-[11px] font-mono font-black text-black bg-[#e28c38] px-1.5 py-0.5 rounded shadow-sm">
+                                x {inCartQty}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all ${
+                            inCartQty > 0
+                              ? 'bg-[#e28c38] text-black font-extrabold shadow-sm'
+                              : 'bg-[#2a221b] text-[#e28c38] group-hover:bg-[#e28c38] group-hover:text-black'
+                          }`}>
+                            + Adicionar
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
             </div>
