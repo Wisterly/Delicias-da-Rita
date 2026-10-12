@@ -6,12 +6,11 @@ import {
   doc, 
   setDoc, 
   deleteDoc, 
-  Firestore,
-  getDocs
+  Firestore
 } from 'firebase/firestore';
 import { Order, Product, Settings } from './types';
 
-// Dados iniciais padrão de "Delícias da Rita"
+// Dados reais do restaurante "Delícias da Rita"
 export const DEFAULT_SETTINGS: Settings = {
   restaurantName: "Delícias da Rita",
   logoUrl: "/logo-rita.png"
@@ -19,103 +18,253 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const DEFAULT_PRODUCTS: Product[] = [
   {
-    id: "prod-1",
-    name: "Feijoada Completa da Rita",
-    price: 49.90,
-    category: "Pratos Principais",
-    description: "Feijão preto encorpado com carnes nobres, arroz branco soltinho, couve refogada no alho, farofa crocante e laranja.",
-    image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80"
+    id: "prod-arrumadinho-grande",
+    name: "Arrumadinho - Grande",
+    price: 25,
+    category: "Arrumadinho",
+    description: "Porção grande e farta com feijão temperado, carne de sol em cubos dourada na manteiga, farofa crocante, vinagrete fresco e purê aveludado da casa.",
+    image: "/produtos/arrumadinho-grande.jpg"
   },
   {
-    id: "prod-2",
-    name: "Escondidinho de Carne Seca",
-    price: 42.00,
-    category: "Pratos Principais",
-    description: "Purê cremoso de mandioca artesanal, recheio farto de carne seca desfiada e queijo coalho gratinado.",
-    image: "https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80"
+    id: "prod-arrumadinho-pequeno",
+    name: "Arrumadinho - Pequeno",
+    price: 18,
+    category: "Arrumadinho",
+    description: "Porção individual generosa com carne de sol selecionada em cubos, feijão temperado, farofa crocante da Rita, vinagrete fresquinho e purê especial.",
+    image: "/produtos/arrumadinho-pequeno.jpg"
   },
   {
-    id: "prod-3",
-    name: "Galinhada Caipira com Pequi",
-    price: 45.00,
-    category: "Pratos Principais",
-    description: "Frango caipira cozido lentamente no caldo temperado com açafrão da terra, arroz e cheiro-verde fresco.",
-    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80"
+    id: "prod-creme-galinha-grande",
+    name: "Creme de Galinha - Grande",
+    price: 10,
+    category: "Cremes & Caldos",
+    description: "Tigela grande com o tradicional e aclamado creme de galinha da Rita: frango desfiado suculento, creme aveludado de milho, azeitonas e cheiro-verde.",
+    image: "/produtos/creme-galinha-grande.jpg"
   },
   {
-    id: "prod-4",
-    name: "Bobó de Camarão Cremoso",
-    price: 58.00,
-    category: "Pratos Principais",
-    description: "Camarões frescos refogados no azeite de dendê, creme aveludado de aipim com leite de coco e pimentões.",
-    image: "https://images.unsplash.com/photo-1551248429-40975aa4de74?auto=format&fit=crop&w=600&q=80"
+    id: "prod-creme-galinha-pequeno",
+    name: "Creme de Galinha - Pequeno",
+    price: 8,
+    category: "Cremes & Caldos",
+    description: "Tigela média/pequena de creme de galinha artesanal temperado no capricho, bem quentinho, com milho verde, azeitonas fatiadas e frango macio.",
+    image: "/produtos/creme-galinha-pequeno.jpg"
   },
   {
-    id: "prod-5",
-    name: "Porção de Torresmo Pururuca",
-    price: 28.00,
-    category: "Petiscos & Entradas",
-    description: "Torresmo artesanal super crocante por fora e macio por dentro, servido com gomos de limão caipira.",
-    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&q=80"
+    id: "prod-creme-galinha-copo",
+    name: "Creme de Galinha - Copo",
+    price: 6,
+    category: "Cremes & Caldos",
+    description: "Copo térmico prático com creme de galinha delicioso e quentinho, perfeito para uma refeição rápida e saborosa.",
+    image: "/produtos/creme-galinha-copo.jpg"
   },
   {
-    id: "prod-6",
-    name: "Pastelzinhos de Angu (6 unid)",
-    price: 26.00,
-    category: "Petiscos & Entradas",
-    description: "Massa de milho tradicional frita na hora, recheados com carne moída temperadinha e queijo minas.",
-    image: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&q=80"
+    id: "prod-mingau-milho-grande",
+    name: "Mingau de Milho - Grande",
+    price: 10,
+    category: "Mingaus & Doces",
+    description: "Tigela grande de mingau de milho verde artesanal bem cremoso, preparado com leite condensado e polvilhado com canela em pó perfumada.",
+    image: "/produtos/mingau-milho-grande.jpg"
   },
   {
-    id: "prod-7",
-    name: "Suco de Laranja da Fazenda 500ml",
-    price: 12.00,
+    id: "prod-mingau-milho-pequeno",
+    name: "Mingau de Milho - Pequeno",
+    price: 8,
+    category: "Mingaus & Doces",
+    description: "Porção pequena de mingau de milho quentinho e reconfortante, doce na medida certa com toque sutil de canela.",
+    image: "/produtos/mingau-milho-pequeno.jpg"
+  },
+  {
+    id: "prod-mingau-milho-copo",
+    name: "Mingau de Milho - Copo",
+    price: 6,
+    category: "Mingaus & Doces",
+    description: "Copo individual de mingau de milho cremoso, quentinho e servido na hora com canela a gosto.",
+    image: "/produtos/mingau-milho-copo.jpg"
+  },
+  {
+    id: "prod-kreps-misto",
+    name: "Krep's Misto",
+    price: 8,
+    category: "Krep's no Palito",
+    description: "Crepe suíço no palito douradinho e crocante por fora, com recheio duplo e abundante de queijo mussarela derretido e presunto suculento.",
+    image: "/produtos/kreps-misto.jpg"
+  },
+  {
+    id: "prod-kreps-queijo",
+    name: "Krep's de Queijo",
+    price: 8,
+    category: "Krep's no Palito",
+    description: "Crepe suíço no palito quentinho, recheado com queijo derretido de alta cremosidade com casquinha crocante.",
+    image: "/produtos/kreps-queijo.jpg"
+  },
+  {
+    id: "prod-kreps-chocolate",
+    name: "Krep's de Chocolate",
+    price: 12,
+    category: "Krep's no Palito",
+    description: "Delicioso crepe doce no palito recheado com calda cremosa de chocolate suave que derrete a cada mordida.",
+    image: "/produtos/kreps-chocolate.jpg"
+  },
+  {
+    id: "prod-coca-cola-1-litro",
+    name: "Coca-Cola 1 Litro",
+    price: 12,
     category: "Bebidas",
-    description: "Espremido na hora, doce e natural.",
-    image: "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80"
+    description: "Garrafa de Coca-Cola Original 1L, bem gelada, ideal para compartilhar na mesa.",
+    image: "/produtos/coca-cola-1-litro.jpg"
   },
   {
-    id: "prod-8",
-    name: "Caipirinha Tradicional de Cachaça",
-    price: 20.00,
+    id: "prod-coca-cola-lata",
+    name: "Coca-Cola Lata 350ml",
+    price: 7,
     category: "Bebidas",
-    description: "Cachaça artesanal de alambique, limão taiti fresco e açúcar cristal.",
-    image: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80"
+    description: "Lata de Coca-Cola Sabor Original 350ml, estupidamente gelada.",
+    image: "/produtos/coca-cola-lata.jpg"
   },
   {
-    id: "prod-9",
-    name: "Pudim de Leite da Vovó",
-    price: 16.00,
-    category: "Sobremesas",
-    description: "Textura aveludada sem furinhos com calda caramelizada dourada irresistível.",
-    image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80"
+    id: "prod-guarana-1-litro",
+    name: "Guaraná Antarctica 1 Litro",
+    price: 12,
+    category: "Bebidas",
+    description: "Garrafa de Guaraná Antarctica 1L trincando de gelada, sabor autêntico brasileiro.",
+    image: "/produtos/guarana-1-litro.jpg"
+  },
+  {
+    id: "prod-guarana-lata",
+    name: "Guaraná Antarctica Lata 350ml",
+    price: 7,
+    category: "Bebidas",
+    description: "Lata de Guaraná Antarctica 350ml gelada na temperatura ideal.",
+    image: "/produtos/guarana-lata.jpg"
+  },
+  {
+    id: "prod-agua-mineral-500ml",
+    name: "Água Mineral sem Gás 500ml",
+    price: 5,
+    category: "Bebidas",
+    description: "Garrafa de água mineral pura e refrescante de 500ml, sem gás.",
+    image: "/produtos/agua-mineral-500ml.jpg"
+  },
+  {
+    id: "prod-heineken-garrafa",
+    name: "Cerveja Heineken Garrafa 600ml",
+    price: 16,
+    category: "Cervejas",
+    description: "Cerveja Heineken puro malte garrafa 600ml, servida trincando na mesa com balde de gelo.",
+    image: "/produtos/heineken-garrafa.jpg"
+  },
+  {
+    id: "prod-heineken-lata",
+    name: "Cerveja Heineken Lata 350ml",
+    price: 9,
+    category: "Cervejas",
+    description: "Cerveja Heineken lata 350ml puro malte, super refrescante e gelada.",
+    image: "/produtos/heineken-lata.jpg"
+  },
+  {
+    id: "prod-spaten-garrafa",
+    name: "Cerveja Spaten Garrafa 600ml",
+    price: 14,
+    category: "Cervejas",
+    description: "Cerveja puro malte Munich Helles tradicional alemã Spaten 600ml garrafa.",
+    image: "/produtos/spaten-garrafa.jpg"
+  },
+  {
+    id: "prod-spaten-lata",
+    name: "Cerveja Spaten Lata 350ml",
+    price: 8,
+    category: "Cervejas",
+    description: "Cerveja puro malte Spaten lata 350ml com sabor marcante e amargor equilibrado.",
+    image: "/produtos/spaten-lata.jpg"
+  },
+  {
+    id: "prod-stella-artois-garrafa",
+    name: "Cerveja Stella Artois Garrafa 550ml",
+    price: 15,
+    category: "Cervejas",
+    description: "Cerveja Premium Lager belga Stella Artois garrafa, sabor sofisticado e refrescante.",
+    image: "/produtos/stella-artois-garrafa.jpg"
+  },
+  {
+    id: "prod-stella-artois-lata",
+    name: "Cerveja Stella Artois Lata 350ml",
+    price: 8,
+    category: "Cervejas",
+    description: "Cerveja Stella Artois em lata 350ml, perfeita para acompanhar os pratos da Rita.",
+    image: "/produtos/stella-artois-lata.jpg"
+  },
+  {
+    id: "prod-brahma-garrafa",
+    name: "Cerveja Brahma Garrafa 600ml",
+    price: 12,
+    category: "Cervejas",
+    description: "Cerveja Brahma Chopp garrafa 600ml tradicional, o clássico chopp na garrafa.",
+    image: "/produtos/brahma-garrafa.jpg"
+  },
+  {
+    id: "prod-brahma-lata",
+    name: "Cerveja Brahma Lata 350ml",
+    price: 6,
+    category: "Cervejas",
+    description: "Cerveja Brahma Chopp lata 350ml bem geladinha.",
+    image: "/produtos/brahma-lata.jpg"
+  },
+  {
+    id: "prod-skol-garrafa",
+    name: "Cerveja Skol Garrafa 600ml",
+    price: 12,
+    category: "Cervejas",
+    description: "Cerveja Skol garrafa 600ml que desce redondo, bem estupidamente gelada.",
+    image: "/produtos/skol-garrafa.jpg"
+  },
+  {
+    id: "prod-skol-lata",
+    name: "Cerveja Skol Lata 350ml",
+    price: 6,
+    category: "Cervejas",
+    description: "Cerveja Skol lata 350ml leve e refrescante.",
+    image: "/produtos/skol-lata.jpg"
   }
 ];
 
 export const DEFAULT_ORDERS: Order[] = [
   {
-    id: "cmd-1",
-    orderCode: "#101",
-    table: "Mesa 03",
-    customer: "Família Souza",
-    status: "Aberta",
+    id: "cmd-1791819200064",
+    orderCode: "#585",
+    table: "Mesa 01",
+    customer: "",
+    status: "Finalizada",
     items: [
       {
-        id: "prod-1",
-        name: "Feijoada Completa da Rita",
-        price: 49.90,
-        qty: 2,
-        notes: "Farofa extra"
+        id: "prod-arrumadinho-grande",
+        name: "Arrumadinho - Grande",
+        price: 25,
+        qty: 1,
+        notes: ""
       },
       {
-        id: "prod-7",
-        name: "Suco de Laranja da Fazenda 500ml",
-        price: 12.00,
-        qty: 2,
-        notes: "Sem açúcar"
+        id: "prod-mingau-milho-pequeno",
+        name: "Mingau de Milho - Pequeno",
+        price: 8,
+        qty: 3,
+        notes: ""
+      },
+      {
+        id: "prod-agua-mineral-500ml",
+        name: "Água Mineral sem Gás 500ml",
+        price: 5,
+        qty: 1,
+        notes: ""
+      },
+      {
+        id: "prod-guarana-1-litro",
+        name: "Guaraná Antarctica 1 Litro",
+        price: 12,
+        qty: 1,
+        notes: ""
       }
     ],
-    total: 123.80,
+    total: 66,
     createdAt: new Date().toISOString()
   }
 ];
@@ -180,9 +329,8 @@ class CloudSyncService {
         snapshot.forEach((doc) => {
           list.push({ id: doc.id, ...doc.data() } as Order);
         });
-        // Ordena por data mais recente
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        localStorage.setItem('delicias_orders_cache', JSON.stringify(list));
+        localStorage.setItem('delicias_orders_cache_v2', JSON.stringify(list));
         onUpdate(list);
       }, (err) => {
         console.warn("Erro no listener do Firestore:", err);
@@ -190,7 +338,6 @@ class CloudSyncService {
       });
     }
 
-    // Fallback Local
     onUpdate(this.getLocalOrders());
     const interval = setInterval(() => {
       onUpdate(this.getLocalOrders());
@@ -199,14 +346,12 @@ class CloudSyncService {
   }
 
   public async saveOrder(order: Order): Promise<void> {
-    // 1. Salva local
     const local = this.getLocalOrders();
     const idx = local.findIndex(o => o.id === order.id);
     if (idx >= 0) local[idx] = order;
     else local.unshift(order);
-    localStorage.setItem('delicias_orders_cache', JSON.stringify(local));
+    localStorage.setItem('delicias_orders_cache_v2', JSON.stringify(local));
 
-    // 2. Salva no Firestore
     if (this.isConnected && this.db) {
       try {
         await setDoc(doc(this.db, 'orders', order.id), order, { merge: true });
@@ -217,12 +362,10 @@ class CloudSyncService {
   }
 
   public async deleteOrder(orderId: string): Promise<void> {
-    // 1. Local
     let local = this.getLocalOrders();
     local = local.filter(o => o.id !== orderId);
-    localStorage.setItem('delicias_orders_cache', JSON.stringify(local));
+    localStorage.setItem('delicias_orders_cache_v2', JSON.stringify(local));
 
-    // 2. Firestore
     if (this.isConnected && this.db) {
       try {
         await deleteDoc(doc(this.db, 'orders', orderId));
@@ -234,7 +377,7 @@ class CloudSyncService {
 
   public getLocalOrders(): Order[] {
     try {
-      const data = localStorage.getItem('delicias_orders_cache');
+      const data = localStorage.getItem('delicias_orders_cache_v2');
       return data ? JSON.parse(data) : DEFAULT_ORDERS;
     } catch {
       return DEFAULT_ORDERS;
@@ -251,10 +394,9 @@ class CloudSyncService {
           list.push({ id: doc.id, ...doc.data() } as Product);
         });
         if (list.length > 0) {
-          localStorage.setItem('delicias_products_cache', JSON.stringify(list));
+          localStorage.setItem('delicias_products_cache_v2', JSON.stringify(list));
           onUpdate(list);
         } else {
-          // Se vazio, salva os pratos padrão
           this.seedInitialProducts();
           onUpdate(DEFAULT_PRODUCTS);
         }
@@ -280,7 +422,7 @@ class CloudSyncService {
     const idx = local.findIndex(p => p.id === product.id);
     if (idx >= 0) local[idx] = product;
     else local.unshift(product);
-    localStorage.setItem('delicias_products_cache', JSON.stringify(local));
+    localStorage.setItem('delicias_products_cache_v2', JSON.stringify(local));
 
     if (this.isConnected && this.db) {
       try {
@@ -294,7 +436,7 @@ class CloudSyncService {
   public async deleteProduct(productId: string): Promise<void> {
     let local = this.getLocalProducts();
     local = local.filter(p => p.id !== productId);
-    localStorage.setItem('delicias_products_cache', JSON.stringify(local));
+    localStorage.setItem('delicias_products_cache_v2', JSON.stringify(local));
 
     if (this.isConnected && this.db) {
       try {
@@ -307,7 +449,7 @@ class CloudSyncService {
 
   public getLocalProducts(): Product[] {
     try {
-      const data = localStorage.getItem('delicias_products_cache');
+      const data = localStorage.getItem('delicias_products_cache_v2');
       return data ? JSON.parse(data) : DEFAULT_PRODUCTS;
     } catch {
       return DEFAULT_PRODUCTS;
@@ -320,7 +462,7 @@ class CloudSyncService {
       return onSnapshot(doc(this.db, 'settings', 'general'), (docSnap) => {
         if (docSnap.exists()) {
           const s = docSnap.data() as Settings;
-          localStorage.setItem('delicias_settings_cache', JSON.stringify(s));
+          localStorage.setItem('delicias_settings_cache_v2', JSON.stringify(s));
           onUpdate(s);
         } else {
           onUpdate(this.getLocalSettings());
@@ -335,7 +477,7 @@ class CloudSyncService {
   }
 
   public async saveSettings(settings: Settings): Promise<void> {
-    localStorage.setItem('delicias_settings_cache', JSON.stringify(settings));
+    localStorage.setItem('delicias_settings_cache_v2', JSON.stringify(settings));
     if (this.isConnected && this.db) {
       try {
         await setDoc(doc(this.db, 'settings', 'general'), settings, { merge: true });
@@ -347,7 +489,7 @@ class CloudSyncService {
 
   public getLocalSettings(): Settings {
     try {
-      const data = localStorage.getItem('delicias_settings_cache');
+      const data = localStorage.getItem('delicias_settings_cache_v2');
       return data ? JSON.parse(data) : DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;

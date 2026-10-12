@@ -822,7 +822,7 @@ export default function App() {
                     className="p-3 rounded-2xl bg-[#16181e] border border-[#2d251d] hover:border-[#e28c38]/60 transition-all cursor-pointer flex gap-3 group"
                   >
                     {prod.image && (
-                      <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-black flex-shrink-0">
+                      <div className="w-20 h-20 min-w-[80px] min-h-[80px] sm:w-24 sm:h-24 sm:min-w-[96px] sm:min-h-[96px] rounded-xl overflow-hidden bg-black flex-shrink-0">
                         <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       </div>
                     )}
