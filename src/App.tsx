@@ -486,6 +486,7 @@ export default function App() {
               <img 
                 src="/bg-hero.jpg" 
                 alt="Buffet Delícias da Rita" 
+                decoding="async"
                 className="w-full h-full object-cover object-center filter brightness-[0.78]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/delicias-da-rita.jpg';
@@ -914,7 +915,13 @@ export default function App() {
                   >
                     {prod.image && (
                       <div className="w-20 h-20 min-w-[80px] min-h-[80px] sm:w-24 sm:h-24 sm:min-w-[96px] sm:min-h-[96px] rounded-xl overflow-hidden bg-black flex-shrink-0">
-                        <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <img 
+                          src={prod.image} 
+                          alt={prod.name} 
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                        />
                       </div>
                     )}
                     <div className="flex-1 flex flex-col justify-between min-w-0">
