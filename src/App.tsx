@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ShoppingBag,
   Cloud,
-  CheckCircle
+  CheckCircle,
+  QrCode
 } from 'lucide-react';
 import { Product, Order, OrderItem, Settings } from './types';
 import { cloudSync, DEFAULT_SETTINGS, DEFAULT_PRODUCTS, DEFAULT_ORDERS } from './firebase';
@@ -30,6 +31,18 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
   const [orders, setOrders] = useState<Order[]>(DEFAULT_ORDERS);
+
+  // Modo Cliente por QR Code na Mesa (?mesa=1 ou ?mesa=01 ou ?mesa=Mesa%2001)
+  const [customerMesaParam, setCustomerMesaParam] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('mesa');
+      return p ? p.trim() : null;
+    }
+    return null;
+  });
+
+  // Modal para Visualizar / Imprimir QR Code da Mesa
+  const [qrModalTable, setQrModalTable] = useState<string | null>(null);
 
   // Estado para Criar Nova Comanda (Aba Nova Comanda)
   const [newOrderTable, setNewOrderTable] = useState('Mesa 01');
@@ -349,6 +362,99 @@ export default function App() {
     win.document.close();
   };
 
+  // --- QR CODES DAS MESAS ---
+  const getTableQrUrl = (tableNumberOrName: string) => {
+    const match = tableNumberOrName.match(/\d+/);
+    const num = match ? String(parseInt(match[0], 10)).padStart(2, '0') : '01';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://delicias-da-rita.vercel.app';
+    return `${baseUrl}/?mesa=${num}`;
+  };
+
+  const handlePrintTableQr = (tableName: string) => {
+    const match = tableName.match(/\d+/);
+    const num = match ? String(parseInt(match[0], 10)).padStart(2, '0') : '01';
+    const qrUrl = getTableQrUrl(tableName);
+    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrUrl)}&margin=10`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <html>
+        <head>
+          <title>QR Code - Mesa ${num} - ${settings.restaurantName}</title>
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 25px; margin: 0; background: #fff; color: #111; }
+            .card { border: 3px solid #d97c27; border-radius: 20px; padding: 30px; max-width: 360px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+            h1 { margin: 0 0 5px 0; font-size: 26px; color: #111; font-weight: 800; }
+            h2 { margin: 0 0 15px 0; font-size: 20px; color: #d97c27; text-transform: uppercase; letter-spacing: 2px; }
+            img { width: 260px; height: 260px; margin: 15px 0; display: block; margin-left: auto; margin-right: auto; }
+            p { font-size: 13px; color: #555; line-height: 1.5; margin: 10px 0 0 0; }
+            .badge { background: #fdf2e9; color: #d97c27; font-weight: bold; font-size: 12px; padding: 4px 10px; border-radius: 999px; display: inline-block; }
+          </style>
+        </head>
+        <body onload="window.print()">
+          <div class="card">
+            <h1>${settings.restaurantName}</h1>
+            <h2>MESA ${num}</h2>
+            <span class="badge">COMANDA DIGITAL AO VIVO</span>
+            <img src="${qrImg}" alt="QR Code Mesa ${num}" />
+            <p><strong>Aponte a câmera do seu celular</strong> para acompanhar sua conta e pedidos em tempo real!</p>
+          </div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  const handlePrintAllTableQrs = () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://delicias-da-rita.vercel.app';
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const cardsHtml = Array.from({ length: 10 }, (_, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const qrUrl = `${baseUrl}/?mesa=${num}`;
+      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrUrl)}&margin=10`;
+      return `
+        <div class="card">
+          <h1>${settings.restaurantName}</h1>
+          <h2>MESA ${num}</h2>
+          <span class="badge">COMANDA AO VIVO</span>
+          <img src="${qrImg}" alt="QR Code Mesa ${num}" />
+          <p>Aponte a câmera para ver sua conta</p>
+        </div>
+      `;
+    }).join('');
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Todas as Mesas (1 a 10) - ${settings.restaurantName}</title>
+          <style>
+            body { font-family: sans-serif; text-align: center; padding: 20px; margin: 0; background: #fff; color: #111; }
+            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 800px; margin: 0 auto; }
+            .card { border: 2px dashed #d97c27; border-radius: 16px; padding: 20px; page-break-inside: avoid; }
+            h1 { margin: 0; font-size: 18px; color: #111; font-weight: 800; }
+            h2 { margin: 4px 0 8px 0; font-size: 16px; color: #d97c27; font-weight: bold; }
+            img { width: 170px; height: 170px; margin: 8px auto; display: block; }
+            p { font-size: 11px; color: #555; margin: 4px 0 0 0; }
+            .badge { background: #fdf2e9; color: #d97c27; font-weight: bold; font-size: 10px; padding: 2px 8px; border-radius: 999px; }
+            @media print {
+              body { padding: 0; }
+              .card { border: 1px dashed #999; }
+            }
+          </style>
+        </head>
+        <body onload="window.print()">
+          <h2 style="margin-bottom: 20px; color: #333;">Plaquinhas de Mesa (1 a 10) - Recorte e cole nas mesas</h2>
+          <div class="grid">
+            ${cardsHtml}
+          </div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   // --- CONFIGURAÇÕES: PRODUTOS E IDENTIDADE ---
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,6 +512,144 @@ export default function App() {
       (p.description && p.description.toLowerCase().includes(searchMenuQuery.toLowerCase()));
     return matchCat && matchSearch;
   });
+
+  // --- VISÃO DO CLIENTE VIA QR CODE NA MESA (?mesa=1 a 10) ---
+  if (customerMesaParam) {
+    const mesaNumberMatch = customerMesaParam.match(/\d+/);
+    const targetMesaNum = mesaNumberMatch ? parseInt(mesaNumberMatch[0], 10) : 1;
+    const targetMesaStr = `Mesa ${String(targetMesaNum).padStart(2, '0')}`;
+
+    // Procura comanda ativa para esta mesa
+    const activeTableOrder = orders.find(o => {
+      if (o.status === 'Finalizada') return false;
+      const match = o.table.match(/\d+/);
+      if (!match) return false;
+      return parseInt(match[0], 10) === targetMesaNum;
+    });
+
+    return (
+      <div className="min-h-screen bg-[#111215] text-[#edeef0] flex flex-col font-sans selection:bg-[#e28c38] selection:text-black">
+        {/* Topo com Logo e Mesa */}
+        <header className="bg-[#181a20] border-b border-[#2d251e] p-4 sticky top-0 z-50 shadow-lg">
+          <div className="max-w-md mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-[#e28c38] bg-black flex-shrink-0 shadow-md">
+                <img 
+                  src={settings.logoUrl || '/logo-rita.png'} 
+                  alt="Logo" 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              </div>
+              <div>
+                <h1 className="font-extrabold text-sm text-[#e8d8be]">{settings.restaurantName}</h1>
+                <p className="text-xs text-[#e28c38] font-bold">Comanda Digital</p>
+              </div>
+            </div>
+            <div className="bg-[#2a221b] border border-[#e28c38]/50 px-3 py-1 rounded-full text-xs font-mono font-black text-[#e28c38]">
+              {targetMesaStr}
+            </div>
+          </div>
+        </header>
+
+        {/* Conteúdo da Comanda da Mesa */}
+        <main className="max-w-md mx-auto w-full p-4 flex-1 flex flex-col justify-between">
+          <div className="space-y-4">
+            
+            {activeTableOrder ? (
+              <>
+                {/* Status da Comanda Aberta */}
+                <div className="p-4 rounded-2xl bg-[#181a20] border border-[#3b3025] shadow-md flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Comanda Aberta</span>
+                    </div>
+                    {activeTableOrder.customer && (
+                      <p className="text-xs text-[#a39480] mt-1">Cliente: <strong className="text-white">{activeTableOrder.customer}</strong></p>
+                    )}
+                  </div>
+                  <span className="font-mono text-xs font-bold text-[#e28c38] bg-[#29221b] px-2.5 py-1 rounded-lg border border-[#e28c38]/30">
+                    {activeTableOrder.orderCode}
+                  </span>
+                </div>
+
+                {/* Lista de Itens Lançados */}
+                <div className="p-4 rounded-2xl bg-[#181a20] border border-[#302820] shadow-md space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#a89985] pb-2 border-b border-[#2d261e] flex items-center justify-between">
+                    <span>Itens do seu Pedido</span>
+                    <span>{activeTableOrder.items.reduce((acc, it) => acc + it.qty, 0)} itens</span>
+                  </h3>
+
+                  <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                    {activeTableOrder.items.map((it, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs p-2.5 rounded-xl bg-[#121317] border border-[#25201a]">
+                        <div className="flex-1 pr-2">
+                          <div className="flex items-center gap-2 font-bold text-white">
+                            <span className="text-[#e28c38] font-mono">{it.qty}x</span>
+                            <span>{it.name}</span>
+                          </div>
+                          {it.notes && (
+                            <p className="text-[10px] text-[#8e8070] italic pl-4">↳ Obs: {it.notes}</p>
+                          )}
+                        </div>
+                        <span className="font-mono font-bold text-[#e8d8be]">
+                          R$ {(it.price * it.qty).toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total da Conta */}
+                  <div className="pt-3 border-t border-[#2d261e] flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#a89985]">Total da Comanda:</span>
+                    <span className="text-2xl font-black text-[#e28c38] font-mono">
+                      R$ {activeTableOrder.total.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-center p-3 rounded-xl bg-[#181a20]/60 border border-[#2d261e] text-[11px] text-[#8e8070]">
+                  💡 Novos pratos ou bebidas solicitados ao garçom aparecerão aqui automaticamente!
+                </div>
+              </>
+            ) : (
+              /* MESA LIVRE / ZERADA */
+              <div className="py-12 px-6 rounded-2xl bg-[#181a20] border border-[#302820] text-center shadow-xl space-y-4 my-auto">
+                <div className="w-16 h-16 rounded-full bg-[#2a221b] border border-[#e28c38]/40 flex items-center justify-center text-[#e28c38] mx-auto shadow-md">
+                  <UtensilsCrossed className="w-8 h-8" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">{targetMesaStr} Livre</h2>
+                  <p className="text-xs text-[#a89985] mt-1">Seja muito bem-vindo(a) ao Delícias da Rita!</p>
+                </div>
+                <div className="p-4 rounded-xl bg-[#121317] border border-[#26221c] inline-block w-full">
+                  <span className="text-xs text-[#8e8070] block">Valor atual:</span>
+                  <span className="text-2xl font-black text-[#e28c38] font-mono">R$ 0,00</span>
+                </div>
+                <p className="text-xs text-[#8e8070] leading-relaxed">
+                  Faça o seu pedido com o nosso garçom/atendente. Assim que os pratos forem lançados, sua comanda aparecerá aqui em tempo real!
+                </p>
+              </div>
+            )}
+
+          </div>
+
+          {/* Rodapé: Voltar ao Painel */}
+          <div className="pt-6 pb-2 text-center">
+            <button
+              onClick={() => {
+                window.location.href = window.location.pathname;
+              }}
+              className="text-[11px] text-[#716658] hover:text-[#e28c38] underline transition-colors"
+            >
+              É atendente do restaurante? Abrir Painel Completo
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#111215] text-[#edeef0] flex flex-col font-sans selection:bg-[#e28c38] selection:text-black">
@@ -655,13 +899,23 @@ export default function App() {
               <p className="text-xs text-[#8e8070]">Sincronizado ao vivo entre todos os celulares e computadores</p>
             </div>
 
-            <button
-              onClick={() => setActiveTab('new-order')}
-              className="px-4 py-2 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Nova Comanda</span>
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              <button
+                onClick={() => setQrModalTable('Mesa 01')}
+                className="px-3.5 py-2 rounded-xl bg-[#20232c] hover:bg-[#2b303d] text-[#e28c38] font-bold text-xs flex items-center justify-center gap-1.5 border border-[#e28c38]/30 shadow-md transition-all"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>QR Code das Mesas (1 a 10)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('new-order')}
+                className="px-4 py-2 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nova Comanda</span>
+              </button>
+            </div>
           </div>
 
           {/* Grid de Comandas */}
@@ -835,6 +1089,13 @@ export default function App() {
                       <div className="flex items-center justify-between pt-1 text-xs">
                         <div className="flex items-center gap-2">
                           <button
+                            onClick={() => setQrModalTable(order.table)}
+                            className="text-[#e28c38] hover:underline flex items-center gap-1 text-[11px]"
+                            title="Ver QR Code da Mesa"
+                          >
+                            <QrCode className="w-3.5 h-3.5" /> QR Code
+                          </button>
+                          <button
                             onClick={() => handleShareWhatsApp(order)}
                             className="text-[#34d399] hover:underline flex items-center gap-1 text-[11px]"
                             title="Enviar no WhatsApp"
@@ -1002,15 +1263,50 @@ export default function App() {
                 {/* Campos de Mesa e Cliente */}
                 <div className="space-y-3 my-4">
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#a89985] mb-1">Identificação da Mesa / Balcão *</label>
-                    <input
-                      type="text"
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-semibold text-[#a89985]">Selecione a Mesa (1 a 10) *</label>
+                      <span className="text-[11px] font-bold text-[#e28c38] font-mono">{newOrderTable}</span>
+                    </div>
+
+                    {/* Botões Rápidos de Toque (1 a 10) */}
+                    <div className="grid grid-cols-5 gap-1.5 mb-2">
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const mStr = `Mesa ${String(i + 1).padStart(2, '0')}`;
+                        const isSel = newOrderTable === mStr;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setNewOrderTable(mStr)}
+                            className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                              isSel 
+                                ? 'bg-[#e28c38] text-black font-extrabold shadow-md scale-105' 
+                                : 'bg-[#121317] text-[#d4c3ab] hover:bg-[#22242e] border border-[#2d261e]'
+                            }`}
+                          >
+                            Mesa {i + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Menu Suspenso Alternativo */}
+                    <select
                       value={newOrderTable}
                       onChange={(e) => setNewOrderTable(e.target.value)}
-                      placeholder="Ex: Mesa 03 / Balcão 01"
-                      required
                       className="w-full bg-[#121317] border border-[#2d261e] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#e28c38]"
-                    />
+                    >
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const mStr = `Mesa ${String(i + 1).padStart(2, '0')}`;
+                        return (
+                          <option key={i} value={mStr}>
+                            {mStr}
+                          </option>
+                        );
+                      })}
+                      <option value="Balcão">Balcão</option>
+                      <option value="Delivery / Viagem">Delivery / Viagem</option>
+                    </select>
                   </div>
 
                   <div>
@@ -1620,6 +1916,122 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ========================================================
+          MODAL: QR CODE DAS MESAS (EMISSÃO & IMPRESSÃO)
+         ======================================================== */}
+      {qrModalTable && (() => {
+        const match = qrModalTable.match(/\d+/);
+        const currentTableNum = match ? parseInt(match[0], 10) : 1;
+        const currentTableStr = `Mesa ${String(currentTableNum).padStart(2, '0')}`;
+        const tableUrl = getTableQrUrl(currentTableStr);
+        const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(tableUrl)}&margin=10`;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#181a20] w-full max-w-md rounded-2xl p-6 border border-[#3e342a] shadow-2xl space-y-4">
+              
+              {/* Topo do Modal */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#2d261e]">
+                <div className="flex items-center gap-2">
+                  <QrCode className="w-5 h-5 text-[#e28c38]" />
+                  <h3 className="text-base font-bold text-[#e8d8be]">
+                    QR Code da {currentTableStr}
+                  </h3>
+                </div>
+                <button onClick={() => setQrModalTable(null)} className="text-[#8e8070] hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Seletor Rápido de Mesas (1 a 10) */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#8e8070] mb-1.5">Alternar Mesa:</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {Array.from({ length: 10 }, (_, i) => {
+                    const mNum = i + 1;
+                    const mName = `Mesa ${String(mNum).padStart(2, '0')}`;
+                    const isSel = currentTableNum === mNum;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setQrModalTable(mName)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isSel
+                            ? 'bg-[#e28c38] text-black shadow-md font-extrabold'
+                            : 'bg-[#121317] text-[#d4c3ab] hover:bg-[#252834] border border-[#2d261e]'
+                        }`}
+                      >
+                        {mNum}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Imagem do QR Code com Borda de Plaquinha */}
+              <div className="bg-[#fff] p-5 rounded-2xl border-4 border-[#e28c38] text-center shadow-lg mx-auto w-fit">
+                <span className="text-[11px] font-extrabold text-black uppercase tracking-wider block mb-1">
+                  {settings.restaurantName}
+                </span>
+                <span className="text-lg font-black text-[#d97c27] block mb-2 font-mono">
+                  {currentTableStr.toUpperCase()}
+                </span>
+                <img 
+                  src={qrImgUrl} 
+                  alt={`QR Code ${currentTableStr}`} 
+                  className="w-52 h-52 mx-auto rounded-lg shadow-sm"
+                />
+                <span className="text-[10px] text-gray-700 font-semibold block mt-2">
+                  Aponte a câmera para ver a comanda
+                </span>
+              </div>
+
+              {/* Link Direto */}
+              <div className="p-2.5 rounded-xl bg-[#121317] border border-[#2d261e] text-[11px] text-[#8e8070] flex items-center justify-between">
+                <span className="truncate pr-2 font-mono text-[#d4c3ab]">{tableUrl}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(tableUrl);
+                    alert(`Link da ${currentTableStr} copiado com sucesso!`);
+                  }}
+                  className="text-[#e28c38] font-bold hover:underline whitespace-nowrap"
+                >
+                  Copiar
+                </button>
+              </div>
+
+              <p className="text-[11px] text-[#8e8070] text-center leading-relaxed">
+                💡 O QR Code desta mesa é <strong>fixo</strong>. Ao fechar a conta da mesa, o QR Code zera automaticamente para o próximo cliente!
+              </p>
+
+              {/* Ações de Impressão */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#2d261e]">
+                <button
+                  type="button"
+                  onClick={() => handlePrintTableQr(currentTableStr)}
+                  className="py-2.5 px-3 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-extrabold text-xs uppercase flex items-center justify-center gap-1.5 shadow-md transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir {currentTableStr}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintAllTableQrs}
+                  className="py-2.5 px-3 rounded-xl bg-[#232630] hover:bg-[#2e3342] text-[#e28c38] font-bold text-xs uppercase flex items-center justify-center gap-1.5 border border-[#e28c38]/40 transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir Mesas 1 a 10</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
