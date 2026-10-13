@@ -10,9 +10,27 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preload" as="image" href="/logo-rita.png" type="image/png" />
     <link rel="preload" as="image" href="/bg-hero.jpg" type="image/jpeg" />
+
+    <!-- PWA (Progressive Web App - Aplicativo Instalável) -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#e28c38" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Comandas" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
   <body class="bg-[#0f1117] text-slate-100 min-h-screen selection:bg-amber-500 selection:text-slate-950">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.log('SW registration error:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

@@ -18,7 +18,9 @@ import {
   ShoppingBag,
   Cloud,
   CheckCircle,
-  QrCode
+  QrCode,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { Product, Order, OrderItem, Settings } from './types';
 import { cloudSync, DEFAULT_SETTINGS, DEFAULT_PRODUCTS, DEFAULT_ORDERS } from './firebase';
@@ -81,6 +83,58 @@ export default function App() {
   const fileInputLogoRef = useRef<HTMLInputElement>(null);
   const fileInputProdRef = useRef<HTMLInputElement>(null);
   const cartSummaryRef = useRef<HTMLDivElement>(null);
+
+  // Suporte a Instalação de App no Celular (PWA)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
+  const [showIosInstallModal, setShowIosInstallModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Detecta se já está rodando como App instalado (standalone)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (isStandalone) {
+      setIsAppInstalled(true);
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsAppInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallAppClick = async () => {
+    // Se for iOS / iPhone (Safari)
+    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    if (isIos) {
+      setShowIosInstallModal(true);
+      return;
+    }
+
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        setIsAppInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // Caso o evento já tenha disparado ou o navegador precise de instrução
+      setShowIosInstallModal(true);
+    }
+  };
 
   // 1. SINCRONIZAÇÃO EM TEMPO REAL (FIREBASE / LOCAL)
   useEffect(() => {
@@ -759,6 +813,18 @@ export default function App() {
             </button>
           </nav>
 
+          {/* Botão Instalar App no Celular */}
+          {!isAppInstalled && (
+            <button
+              onClick={handleInstallAppClick}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#e28c38] to-[#d07b28] text-black font-extrabold text-xs shadow-md hover:brightness-110 active:scale-95 transition-all"
+              title="Instalar aplicativo no celular ou computador"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Instalar App</span>
+            </button>
+          )}
+
         </div>
       </header>
 
@@ -866,6 +932,33 @@ export default function App() {
                 </div>
 
               </div>
+
+              {/* BANNER / BOTÃO PARA INSTALAR APLICATIVO NO CELULAR */}
+              {!isAppInstalled && (
+                <div className="mt-4 bg-gradient-to-r from-[#201a14] via-[#292017] to-[#1e1b17] border border-[#e28c38]/40 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+                    <div className="w-11 h-11 rounded-xl bg-[#e28c38]/20 border border-[#e28c38]/50 flex items-center justify-center text-[#e28c38] shrink-0">
+                      <Smartphone className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-[#f5ebd9] flex items-center gap-2">
+                        Instalar Aplicativo no Celular
+                        <span className="text-[10px] bg-[#e28c38] text-black font-extrabold px-1.5 py-0.5 rounded">RÁPIDO</span>
+                      </h4>
+                      <p className="text-xs text-[#a99882]">
+                        Crie um ícone na tela inicial para abrir como aplicativo de tela cheia.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleInstallAppClick}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Instalar Agora</span>
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>
@@ -2063,6 +2156,54 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* ========================================================
+          MODAL: COMO INSTALAR O APLICATIVO NO CELULAR (CHROME & SAFARI)
+         ======================================================== */}
+      {showIosInstallModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-[#181a20] w-full max-w-sm rounded-2xl p-6 border border-[#3e342a] shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#2d261e]">
+              <div className="flex items-center gap-2 text-[#e28c38]">
+                <Smartphone className="w-5 h-5" />
+                <h3 className="text-base font-bold text-[#e8d8be]">
+                  Instalar Aplicativo
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowIosInstallModal(false)}
+                className="text-[#8e8070] hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-[#d4c3ab]">
+              <div className="bg-[#121317] p-3.5 rounded-xl border border-[#2d261e] space-y-2">
+                <span className="font-bold text-[#e28c38] block text-sm">No Google Chrome (Android / PC):</span>
+                <p>1. Toque nos <strong>3 pontinhos (⋮)</strong> no canto superior do navegador.</p>
+                <p>2. Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</p>
+                <p>3. Confirme para ter o app com ícone próprio na sua tela.</p>
+              </div>
+
+              <div className="bg-[#121317] p-3.5 rounded-xl border border-[#2d261e] space-y-2">
+                <span className="font-bold text-[#e28c38] block text-sm">No Safari (iPhone / iOS):</span>
+                <p>1. Toque no botão de <strong>Compartilhar</strong> (ícone de quadrado com seta para cima ⎋).</p>
+                <p>2. Role as opções e clique em <strong>"Adicionar à Tela de Início"</strong>.</p>
+                <p>3. Toque em <strong>"Adicionar"</strong> no canto superior direito.</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowIosInstallModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#e28c38] hover:bg-[#d07b28] text-black font-extrabold text-xs uppercase tracking-wider shadow-md transition-all"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
